@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
 
 	memset((void*) netEntries, 0, sizeof(netEntries));
 
-	retVal = passiveScan(numOfEntry, netEntries);
+	retVal = passiveScan(numOfEntry, netEntries, 10);
 
 	if (retVal < 0) {
 		DEBUG("[ERROR] Failed while passive scan");
