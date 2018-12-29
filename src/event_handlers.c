@@ -71,6 +71,35 @@ void SimpleLinkGeneralEventHandler(SlDeviceEvent_t *pDevEvent) {
 	 * appropriately by the application
 	 */
 	DEBUG("[GENERAL EVENT]");
+
+		switch (pDevEvent->Event) {
+		case SL_DEVICE_GENERAL_ERROR_EVENT:
+			DEBUG("[SL_DEVICE_GENERAL_ERROR_EVENT]");
+			break;
+		case SL_DEVICE_ABORT_ERROR_EVENT:
+			DEBUG("[SL_DEVICE_ABORT_ERROR_EVENT]");
+			sl_DeviceReportAbort abortEvent = pDevEvent->EventData.deviceReport;
+			DEBUG("Abort Type: %u; Abort Data: %u", abortEvent.AbortType,
+					abortEvent.AbortData);
+			break;
+		case SL_DEVICE_DRIVER_ASSERT_ERROR_EVENT:
+			DEBUG("[SL_DEVICE_DRIVER_ASSERT_ERROR_EVENT]");
+			break;
+		case SL_DEVICE_DRIVER_TIMEOUT_CMD_COMPLETE:
+			DEBUG("[SL_DEVICE_DRIVER_TIMEOUT_CMD_COMPLETE]");
+			break;
+		case SL_DEVICE_DRIVER_TIMEOUT_SYNC_PATTERN:
+			DEBUG("[SL_DEVICE_DRIVER_TIMEOUT_SYNC_PATTERN]");
+			break;
+		case SL_DEVICE_DRIVER_TIMEOUT_ASYNC_EVENT:
+			DEBUG("[SL_DEVICE_DRIVER_TIMEOUT_ASYNC_EVENT]");
+			break;
+		case SL_DEVICE_ERROR_MAX:
+			DEBUG("[SL_DEVICE_ERROR_MAX]");
+			break;
+		default:
+			DEBUG("Unexpected event!!@!@!!");
+	}
 }
 
 void SimpleLinkPingReport(SlPingReport_t *pPingReport) {

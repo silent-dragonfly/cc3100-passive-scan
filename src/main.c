@@ -50,11 +50,11 @@ int main(int argc, char **argv) {
 	DEBUG("Connection policy is cleared and CC3100 has been disconnected");
 
 	_u32 numOfEntry = 20;
-	Sl_WlanNetworkEntry_t netEntries[numOfEntry];
+	PassiveScanEntry_t netEntries[numOfEntry];
 
 	memset((void*) netEntries, 0, sizeof(netEntries));
 
-	retVal = passiveScan(numOfEntry, netEntries, 10);
+	retVal = passiveScan(numOfEntry, netEntries, 1);
 
 	if (retVal < 0) {
 		DEBUG("[ERROR] Failed while passive scan");
@@ -62,13 +62,22 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	printf("      BSSID      \tRSSI\tSSID\n");
+	printf("    SSID    \tRSSI\tCH\tBSSID(s)\n");
 	for (int i = 0; i < retVal; i++) {
-		printf("%02X:%02X:%02X:%02X:%02X:%02X\t%4d\t%s\n",
-				netEntries[i].bssid[0], netEntries[i].bssid[1],
-				netEntries[i].bssid[2], netEntries[i].bssid[3],
-				netEntries[i].bssid[4], netEntries[i].bssid[5],
-				netEntries[i].rssi, netEntries[i].ssid);
+		printf("%s\t%d\t", netEntries[i].ssid, netEntries[i].rssi);
+
+		for(int j = 0; j < netEntries[i].channel_list_len; j++) {
+			printf("%u, ", netEntries[i].channel_list[j]);
+		}
+		printf("\n");
+
+		BSSID_t * bssids = netEntries[i].bssid_list;
+		for (int j = 0; j < netEntries[i].bssid_list_len; j++) {
+			printf("\t%02X:%02X:%02X:%02X:%02X:%02X\n", bssids[j].data[0],
+					bssids[j].data[1], bssids[j].data[2], bssids[j].data[3],
+					bssids[j].data[4], bssids[j].data[5]);
+		}
+		printf("\n");
 	}
 
 	retVal = sl_Stop(SL_STOP_TIMEOUT);
