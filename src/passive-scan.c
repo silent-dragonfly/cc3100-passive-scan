@@ -1,5 +1,13 @@
 #include "passive-scan.h"
 
+#include <windows.h>
+
+LONG time_ms() {
+	SYSTEMTIME time;
+	GetSystemTime(&time);
+	return (time.wSecond * 1000) + time.wMilliseconds;
+}
+
 #define MAX_PACKET_SIZE (1472)
 uint8_t BUFFER[MAX_PACKET_SIZE];
 
@@ -33,9 +41,10 @@ static bool isBeaconFrame(ManagementBeaconFrame_t *beaconFrame) {
 	return true;
 }
 
-int16_t passiveScan(uint8_t Count, PassiveScanEntry_t * pEntries,
-		time_t timeout_sec_per_channel) {
+int16_t passiveScan(uint8_t Count, Sl_WlanNetworkEntry_t * pEntries,
+		LONG timeout_msec) {
 
+	LONG timeout_per_channel = timeout_msec / MAX_CHANNEL;
 	_i32 retVal = 0;
 	uint8_t iCurEntry = 0;
 	_u32 channel = 1;
@@ -47,14 +56,34 @@ int16_t passiveScan(uint8_t Count, PassiveScanEntry_t * pEntries,
 	}
 	DEBUG("L1 socket has been created");
 
-	while (true) {
+	SlSockNonblocking_t enableOption = { .NonblockingEnabled = 1, };
+	retVal = sl_SetSockOpt(SockID, SL_SOL_SOCKET, SL_SO_NONBLOCKING,
+			(_u8 *) &enableOption, sizeof(enableOption));
+	if (retVal < 0) {
+		DEBUG("Failed sl_SetSockOpt: %d", retVal);
+		return -1;
+	}
 
-		time_t startTime = time(NULL);
-		while (time(NULL) - startTime < timeout_sec_per_channel
-				&& iCurEntry < Count) {
+	for (_u32 channel = 1; channel <= MAX_CHANNEL; channel++) {
+
+		SlSocklen_t optlen = sizeof(channel);
+		retVal = sl_SetSockOpt(SockID, SL_SOL_SOCKET, SL_SO_CHANGE_CHANNEL,
+				&channel, optlen);
+		if (retVal < 0) {
+			DEBUG("Failed to change to the channel %u: retVal %d", channel,
+					retVal);
+			return retVal;
+		}
+
+		LONG startTime = time_ms();
+
+		while (time_ms() - startTime < timeout_per_channel && iCurEntry < Count) {
 			retVal = sl_Recv(SockID, BUFFER, MAX_PACKET_SIZE, 0);
 
 			if (retVal < 0) {
+				if (retVal == SL_EAGAIN) {
+					continue;
+				}
 				DEBUG("Failed to sl_Recv: retVal %d", retVal);
 				return retVal;
 			}
@@ -67,41 +96,15 @@ int16_t passiveScan(uint8_t Count, PassiveScanEntry_t * pEntries,
 				continue;
 			}
 
+			// check uniqueness of saving BSSID
 			{
 				bool isBssidSaved = false;
 
-				PassiveScanEntry_t * targetEntry = NULL;
+				Sl_WlanNetworkEntry_t * targetEntry = NULL;
 				for (int i = 0; i < iCurEntry; i++) {
-					BSSID_t *bssids = pEntries[i].bssid_list;
-
-					if (memcmp(pEntries[i].ssid, beaconFrame->SSID.SSID,
-							beaconFrame->SSID.Length) == 0) {
-						targetEntry = &pEntries[i];
-					}
-
-					for (int j = 0; j < pEntries[i].bssid_list_len; j++) {
-						if (memcmp(bssids[j].data, beaconFrame->BSSIDMAC,
-						SL_BSSID_LENGTH) == 0) {
-							isBssidSaved = true;
-
-							bool isChannelSaved = false;
-							for (int k = 0; k < pEntries[i].channel_list_len; k++) {
-								if (channel == pEntries[i].channel_list[k]) {
-									isChannelSaved = true;
-									break;
-								}
-							}
-
-							if (!isChannelSaved) {
-								pEntries[i].channel_list[pEntries[i].channel_list_len] = channel;
-								pEntries[i].channel_list_len++;
-							}
-
-							break;
-						}
-					}
-
-					if (isBssidSaved) {
+					if (memcmp(pEntries[i].bssid, beaconFrame->BSSIDMAC,
+					SL_BSSID_LENGTH) == 0) {
+						isBssidSaved = true;
 						break;
 					}
 				}
@@ -109,55 +112,22 @@ int16_t passiveScan(uint8_t Count, PassiveScanEntry_t * pEntries,
 				if (isBssidSaved) {
 					continue;
 				}
-
-				if (targetEntry != NULL) {
-					if (targetEntry->bssid_list_len >= MAX_BSSID) {
-						DEBUG("[WARNING] list of BSSID is full");
-						continue;
-					}
-
-					memcpy(
-							targetEntry->bssid_list[targetEntry->bssid_list_len].data,
-							beaconFrame->BSSIDMAC, SL_BSSID_LENGTH);
-					targetEntry->bssid_list_len++;
-					continue;
-				}
 			}
 
 			// extract the information to the pEnties
-			PassiveScanEntry_t *entry = &pEntries[iCurEntry++];
+			Sl_WlanNetworkEntry_t *entry = &pEntries[iCurEntry++];
 
 			SSID_t *ssid = &beaconFrame->SSID;
 			memcpy(entry->ssid, ssid->SSID, ssid->Length);
 			entry->ssid[ssid->Length] = '\0';
 			entry->ssid_len = ssid->Length;
 
-			entry->channel_list[entry->channel_list_len] = channel;
-			entry->channel_list_len++;
-
 			entry->rssi = rxHeader->rssi;
 
 			// TODO: find secure type from package
 			entry->sec_type = SL_SEC_TYPE_OPEN;
 
-			memcpy(entry->bssid_list[entry->bssid_list_len].data,
-					beaconFrame->BSSIDMAC, SL_BSSID_LENGTH);
-			entry->bssid_list_len++;
-		}
-
-		channel++;
-
-		if (channel >= 14) {
-			break;
-		}
-
-		SlSocklen_t optlen = sizeof(channel);
-		retVal = sl_SetSockOpt(SockID, SL_SOL_SOCKET, SL_SO_CHANGE_CHANNEL,
-				&channel, optlen);
-		if (retVal < 0) {
-			DEBUG("Failed to change to the channel %u: retVal %d", channel,
-					retVal);
-			return retVal;
+			memcpy(entry->bssid, beaconFrame->BSSIDMAC, SL_BSSID_LENGTH);
 		}
 	}
 
