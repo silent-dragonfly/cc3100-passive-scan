@@ -13,6 +13,6 @@
 #define MAX_CHANNEL (13)
 
 int16_t passiveScan(uint8_t Count, Sl_WlanNetworkEntry_t * ptEntries,
-		LONG timeout_msec);
+        LONG timeout_msec);
 
 #endif // __PASSIVE_SCAN_H__

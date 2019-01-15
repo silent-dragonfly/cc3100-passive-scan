@@ -4,9 +4,16 @@
 #include "simplelink.h"
 #include "sl_common.h"
 
+#include "ieee80211.h"
+
 #include "helpers.h"
 #include "event_handlers.h"
 #include "passive-scan.h"
+
+
+int addBeaconRxFilter();
+int enableBeaconRxFilter();
+int disableBeaconRxFilter();
 
 // global variables
 #ifndef __MAIN_C__
