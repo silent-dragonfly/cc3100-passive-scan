@@ -14,4 +14,4 @@ Please, pay attention to the issues if you want to use it to be informed.
     - all from `${SDK}\cc3100-sdk\simplelink` to `simple-link\simple_link`
     - files from `${SDK}\cc3100-sdk\platform\simplelinkstudio` to `simple-link\simple_link_studio`
 4. `mingw32-make -f Makefile` - build project
-5. `Debug\cc3100=passive-scan.exe` - run
+5. `Debug\cc3100-passive-scan.exe` - run
