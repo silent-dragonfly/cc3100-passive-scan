@@ -11,8 +11,8 @@ LONG time_ms() {
 #define MAX_PACKET_SIZE (1472)
 uint8_t BUFFER[MAX_PACKET_SIZE];
 
-static bool isBeaconFrame(ManagementBeaconFrame_t *beaconFrame) {
-    FrameControl_t *fc = &beaconFrame->FrameControl;
+static bool isBeaconFrame(ieee80211_MgmBeaconFrame_t *beaconFrame) {
+    ieee80211_FrameControl_t *fc = &beaconFrame->FrameControl;
 
     if (fc->Type != TYPE_MANAGEMENT) {
         return false;
@@ -27,7 +27,7 @@ static bool isBeaconFrame(ManagementBeaconFrame_t *beaconFrame) {
         return false;
     }
 
-    SSID_t *ssid = &beaconFrame->SSID;
+    ieee80211_SSID_t *ssid = &beaconFrame->SSID;
     if (ssid->ElementID != ELEMID_SSID) {
         DEBUG("[WARNING] Wrong ElementID of SSID-element field");
         return false;
@@ -91,8 +91,8 @@ int16_t passiveScan(uint8_t Count, Sl_WlanNetworkEntry_t * pEntries,
             }
 
             SlTransceiverRxOverHead_t *rxHeader = BUFFER;
-            ManagementBeaconFrame_t *beaconFrame =
-                    (ManagementBeaconFrame_t *) (BUFFER
+            ieee80211_MgmBeaconFrame_t *beaconFrame =
+                    (ieee80211_MgmBeaconFrame_t *) (BUFFER
                             + sizeof(SlTransceiverRxOverHead_t));
             if (!isBeaconFrame(beaconFrame)) {
                 continue;
@@ -111,7 +111,7 @@ int16_t passiveScan(uint8_t Count, Sl_WlanNetworkEntry_t * pEntries,
                 targetEntry = &pEntries[iCurEntry++];
             }
 
-            SSID_t *ssid = &beaconFrame->SSID;
+            ieee80211_SSID_t *ssid = &beaconFrame->SSID;
             memcpy(targetEntry->ssid, ssid->SSID, ssid->Length);
             targetEntry->ssid[ssid->Length] = '\0';
             targetEntry->ssid_len = ssid->Length;
