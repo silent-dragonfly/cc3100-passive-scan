@@ -2,89 +2,88 @@
 #include "main.h"
 
 int main(int argc, char **argv) {
+    _i32 retVal = configureSimpleLinkToDefaultState();
 
-	_i32 retVal = configureSimpleLinkToDefaultState();
+    if (retVal < 0) {
+        DEBUG("[ERROR] Failed to configure the device in its default state");
+        system("PAUSE");
+        return -1;
+    }
+    DEBUG("Device is configured in default state");
 
-	if (retVal < 0) {
-		DEBUG("[ERROR] Failed to configure the device in its default state");
-		system("PAUSE");
-		return -1;
-	}
-	DEBUG("Device is configured in default state");
+    retVal = sl_Start(0, 0, 0);
 
-	retVal = sl_Start(0, 0, 0);
-
-	if ((retVal < 0) || (ROLE_STA != retVal)) {
-		DEBUG("[ERROR] Failed to start the device as STATION");
-		system("PAUSE");
-		return -1;
-	}
-	DEBUG("Device started as STATION");
+    if ((retVal < 0) || (ROLE_STA != retVal)) {
+        DEBUG("[ERROR] Failed to start the device as STATION");
+        system("PAUSE");
+        return -1;
+    }
+    DEBUG("Device started as STATION");
 
 #define SL_SCAN_DISABLE 0
-	retVal = sl_WlanPolicySet(SL_POLICY_SCAN, SL_SCAN_DISABLE, NULL, 0);
+    retVal = sl_WlanPolicySet(SL_POLICY_SCAN, SL_SCAN_DISABLE, NULL, 0);
 
-	if (retVal < 0) {
-		DEBUG("[ERROR] Failed to disable SL_POLICY_SCAN");
-		system("PAUSE");
-		return -1;
-	}
-	DEBUG("Default Active Scan is disabled");
+    if (retVal < 0) {
+        DEBUG("[ERROR] Failed to disable SL_POLICY_SCAN");
+        system("PAUSE");
+        return -1;
+    }
+    DEBUG("Default Active Scan is disabled");
 
-	retVal = sl_WlanPolicySet(SL_POLICY_CONNECTION,
-			SL_CONNECTION_POLICY(0, 0, 0, 0, 0), NULL, 0);
+    retVal = sl_WlanPolicySet(SL_POLICY_CONNECTION,
+            SL_CONNECTION_POLICY(0, 0, 0, 0, 0), NULL, 0);
 
-	if (retVal < 0) {
-		DEBUG("[ERROR] Failed to clear WLAN_CONNECTION_POLICY");
-		system("PAUSE");
-		return -1;
-	}
+    if (retVal < 0) {
+        DEBUG("[ERROR] Failed to clear WLAN_CONNECTION_POLICY");
+        system("PAUSE");
+        return -1;
+    }
 
-	retVal = sl_WlanDisconnect();
+    retVal = sl_WlanDisconnect();
 
-	if (retVal == 0) {
-		DEBUG("Disconnected from AP");
-	} else {
-		// already disconnected
-	}
-	DEBUG("Connection policy is cleared and CC3100 has been disconnected");
+    if (retVal == 0) {
+        DEBUG("Disconnected from AP");
+    } else {
+        // already disconnected
+    }
+    DEBUG("Connection policy is cleared and CC3100 has been disconnected");
 
-	_u32 numOfEntry = 20;
-	PassiveScanEntry_t netEntries[numOfEntry];
+    DEBUG("Start passive scan");
+    _u32 numOfEntry = 20;
+    PassiveScanEntry_t netEntries[numOfEntry];
+    memset((void*) netEntries, 0, sizeof(netEntries));
+    retVal = passiveScan(numOfEntry, netEntries, MAX_CHANNEL * 1000);
 
-	memset((void*) netEntries, 0, sizeof(netEntries));
+    if (retVal < 0) {
+        DEBUG("[ERROR] Failed while passive scan");
+        system("PAUSE");
+        return -1;
+    }
 
-	retVal = passiveScan(numOfEntry, netEntries, 1);
+    for (int i = 0; i < retVal; i++) {
+        PassiveScanEntry_t *entry = &netEntries[i];
+        printf("network SSID: %s\n", entry->ssid);
 
-	if (retVal < 0) {
-		DEBUG("[ERROR] Failed while passive scan");
-		system("PAUSE");
-		return -1;
-	}
+        printf("      BSSID      \tRSSI\tChannels\n");
+        for (int j = 0; j < entry->bss_list_len; j++) {
+            BSS_t *bss = &(entry->bss_list[j]);
+            printf("%02X:%02X:%02X:%02X:%02X:%02X\t",
+                    bss->bssid[0], bss->bssid[1], bss->bssid[2],
+                    bss->bssid[3], bss->bssid[4], bss->bssid[5]);
+            printf("%4d\t", bss->rssi);
+            for (int k = 0; k < bss->channel_list_len - 1; k++) {
+                printf("%d, ", bss->channel_list[k]);
+            }
+            printf("%d\n", bss->channel_list[bss->channel_list_len - 1]);
+        }
+        printf("\n");
+    }
 
-	printf("    SSID    \tRSSI\tCH\tBSSID(s)\n");
-	for (int i = 0; i < retVal; i++) {
-		printf("%s\t%d\t", netEntries[i].ssid, netEntries[i].rssi);
+    retVal = sl_Stop(SL_STOP_TIMEOUT);
+    if (retVal < 0) {
+        DEBUG("[ERROR] Can not stop device properly");
+    }
 
-		for(int j = 0; j < netEntries[i].channel_list_len; j++) {
-			printf("%u, ", netEntries[i].channel_list[j]);
-		}
-		printf("\n");
-
-		BSSID_t * bssids = netEntries[i].bssid_list;
-		for (int j = 0; j < netEntries[i].bssid_list_len; j++) {
-			printf("\t%02X:%02X:%02X:%02X:%02X:%02X\n", bssids[j].data[0],
-					bssids[j].data[1], bssids[j].data[2], bssids[j].data[3],
-					bssids[j].data[4], bssids[j].data[5]);
-		}
-		printf("\n");
-	}
-
-	retVal = sl_Stop(SL_STOP_TIMEOUT);
-	if (retVal < 0) {
-		DEBUG("[ERROR] Can not stop device properly");
-	}
-
-	system("PAUSE");
-	return 0;
+    system("PAUSE");
+    return 0;
 }
